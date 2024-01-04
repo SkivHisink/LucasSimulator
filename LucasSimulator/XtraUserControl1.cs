@@ -1,9 +1,14 @@
-﻿using DevExpress.XtraEditors.Controls;
+﻿using System;
+using DevExpress.XtraEditors.Controls;
 using DevExpress.XtraGrid.Views.Grid;
 using System.Collections.Generic;
 using System.Globalization;
 using System.ComponentModel;
 using DevExpress.Utils;
+using DevExpress.XtraCharts;
+using DevExpress.XtraEditors;
+using System.Linq;
+using CenterSpace.NMath.Core;
 
 namespace LucasSimulator
 {
@@ -12,6 +17,7 @@ namespace LucasSimulator
         public XtraUserControl1()
         {
             InitializeComponent();
+            xtraTabPage3.PageVisible = false;
         }
 
         private void ComboBoxDouble_EditValueChanging(object sender, ChangingEventArgs e)
@@ -58,7 +64,7 @@ namespace LucasSimulator
         {
             return double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out _);
         }
-        
+
         private void onLoad(object sender, System.EventArgs e)
         {
             if (!this.DesignMode)
@@ -172,7 +178,308 @@ namespace LucasSimulator
                 column.OptionsColumn.AllowSort = DefaultBoolean.False;
             }
         }
+
+        private Simulator simulator;
+
+        private void calculationButton_Click(object sender, System.EventArgs e)
+        {
+            // TODO : check transitionMatrix on 1 in each row
+            var transitionMatrix = new double[16, 16];
+            gridView1.RefreshData();
+            var tempMatrix = (List<Populaster>)gridControl1.DataSource;
+            for (int i = 0; i < tempMatrix.Count; i++)
+            {
+                transitionMatrix[i, 0] = tempMatrix[i].one;
+                transitionMatrix[i, 1] = tempMatrix[i].tw;
+                transitionMatrix[i, 2] = tempMatrix[i].th;
+                transitionMatrix[i, 3] = tempMatrix[i].f;
+                transitionMatrix[i, 4] = tempMatrix[i].fv;
+                transitionMatrix[i, 5] = tempMatrix[i].six;
+                transitionMatrix[i, 6] = tempMatrix[i].sev;
+                transitionMatrix[i, 7] = tempMatrix[i].eig;
+                transitionMatrix[i, 8] = tempMatrix[i].nine;
+                transitionMatrix[i, 9] = tempMatrix[i].ten;
+                transitionMatrix[i, 10] = tempMatrix[i].elev;
+                transitionMatrix[i, 11] = tempMatrix[i].twel;
+                transitionMatrix[i, 12] = tempMatrix[i].thrt;
+                transitionMatrix[i, 13] = tempMatrix[i].fort;
+                transitionMatrix[i, 14] = tempMatrix[i].fivt;
+                transitionMatrix[i, 15] = tempMatrix[i].sixt;
+                double counter = 0.0;
+                for (int j = 0; j < 16; j++)
+                {
+                    counter += transitionMatrix[i, j];
+                }
+
+                if (Math.Abs(1.0 - counter) > 1e-4)
+                {
+                    System.Windows.Forms.MessageBox.Show($"Transition matrix has wrong value at {i + 1} row");
+                }
+            }
+            // Initialization
+            simulator = new Simulator(
+                double.Parse(lambdaOneTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(lambdaTwoTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(lambdaStarOneTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(lambdaStarTwoTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(gOneTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(gTowTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(gStarOneTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(gStarTwoTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(nominalExchangeTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(forwardPremiumTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(forwardPayoffTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(riskPremiumTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(betaTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(thetaTextEdit.Text, CultureInfo.InvariantCulture),
+                double.Parse(gammaTextEdit.Text, CultureInfo.InvariantCulture),
+                transitionMatrix);
+            // Simulation
+            var simResult = simulator.Simulate(int.Parse(simNumTextEdit.Text, CultureInfo.InvariantCulture));
+            gridControl2.DataSource = simResult;
+            gridControl2.Refresh();
+            gridControl2.RefreshDataSource();
+            gridView2.PopulateColumns();
+            gridView2.BestFitColumns();
+            gridView2.RefreshData();
+            // Fill plots
+            FillPlots();
+            // Calculate matricies
+            CalculateMatricies();
+            // Add statistiks
+            AddStatistics();
+            // Show result to user after simulation
+            xtraTabPage3.PageVisible = true;
+        }
+
+        private void AddStatistics()
+        {
+            var stats = new List<StatisticResults>();
+            stats.Add(StatisticResults.MarkResult());
+            stats.Add(StatisticResults.RealResult());
+            //
+            var simResults = gridControl2.DataSource as List<SimulationStepResult>;
+            var series0 = new List<double>();
+            var series1 = new List<double>();
+            var series2 = new List<double>();
+            var series3 = new List<double>();
+            for (int i=0;i<simResults.Count;i++)
+            {
+                series0.Add(simResults[i].St);
+                series1.Add(simResults[i].StDevide);
+                series2.Add(simResults[i].FtDevide);
+                series3.Add(simResults[i].FtMinusStDevide);
+            }
+            stats.Add(new StatisticResults("My model",
+                StatisticResults.CalculateSlope(series1),
+                StatisticResults.CalculateVolatility(series1),
+                StatisticResults.CalculateVolatility(series2),
+                StatisticResults.CalculateVolatility(series3),
+                StatisticResults.CalculateAutocorrelation(series1, 1),
+                StatisticResults.CalculateAutocorrelation(series2, 1),
+                StatisticResults.CalculateAutocorrelation(series3, 1)
+            ));
+            gridControl5.DataSource = stats;
+            gridControl5.Refresh();
+            gridControl5.RefreshDataSource();
+            gridView5.PopulateColumns();
+            gridView5.BestFitColumns();
+            gridView5.RefreshData();
+
+        }
+        private void CalculateMatricies()
+        {
+            var matrixResult = simulator.CalculatePriceDividendMatricies();
+            gridControl3.DataSource = matrixResult.Item1;
+            gridControl3.Refresh();
+            gridControl3.RefreshDataSource();
+            gridView3.PopulateColumns();
+            gridView3.BestFitColumns();
+            gridView3.RefreshData();
+            var column =
+                gridView3.Columns[0];
+            column.OptionsColumn.AllowEdit = false;
+            column.OptionsColumn.AllowMove = false;
+            column.OptionsColumn.AllowSort = DefaultBoolean.False;
+            //
+            gridControl4.DataSource = matrixResult.Item1;
+            gridControl4.Refresh();
+            gridControl4.RefreshDataSource();
+            gridView4.PopulateColumns();
+            gridView4.BestFitColumns();
+            gridView4.RefreshData();
+            column =
+                gridView4.Columns[0];
+            column.OptionsColumn.AllowEdit = false;
+            column.OptionsColumn.AllowMove = false;
+            column.OptionsColumn.AllowSort = DefaultBoolean.False;
+        }
+        private void FillPlots()
+        {
+            chartControl1.Series.Clear();
+            var xValues = new List<double>();
+            var y1Values = new List<double>();
+            var y2Values = new List<double>();
+            var y3Values = new List<double>();
+            var y4Values = new List<double>();
+            var data = gridControl2.DataSource as List<SimulationStepResult>;
+            Series series1 = new Series("S_(t+1)/S_t", ViewType.Line);
+            Series series2 = new Series("F_t/S_t", ViewType.Line);
+            Series series3 = new Series("(F_t-S_(t+1))/S_t", ViewType.Line);
+            Series series4 = new Series("E_t[(F_t-S_(t+1))/S_t]", ViewType.Line);
+            for (int i = 0; i < 97; i++)
+            {
+                xValues.Add(73.0 + i * 0.25);
+                y1Values.Add(data[i].StDevide);
+                y2Values.Add(data[i].FtDevide);
+                y3Values.Add(data[i].FtMinusStDevide);
+                y4Values.Add(data[i].EtFtMinusStDevide);
+                series1.Points.Add(new SeriesPoint(xValues[i], y1Values[i]));
+                series2.Points.Add(new SeriesPoint(xValues[i], y2Values[i]));
+                series3.Points.Add(new SeriesPoint(xValues[i], y3Values[i]));
+                series4.Points.Add(new SeriesPoint(xValues[i], y4Values[i]));
+            }
+            chartControl1.Series.Add(series1);
+            chartControl1.Series.Add(series2);
+            // Cast the chart's diagram to the XYDiagram type, to access its axes.
+            XYDiagram diagram = (XYDiagram)chartControl1.Diagram;
+
+            // Enable the diagram's scrolling.
+            diagram.EnableAxisXScrolling = true;
+            diagram.EnableAxisYScrolling = true;
+
+            // Define the whole range for the X-axis. 
+            diagram.AxisX.WholeRange.Auto = false;
+            diagram.AxisX.WholeRange.SetMinMaxValues(73, 97);
+
+            // Disable the side margins 
+            // (this has an effect only for certain view types).
+            diagram.AxisX.VisualRange.AutoSideMargins = false;
+
+            // Limit the visible range for the X-axis.
+            //diagram.AxisX.VisualRange.Auto = false;
+            diagram.AxisX.VisualRange.SetMinMaxValues(72, 98);
+
+            // Define the whole range for the Y-axis. 
+            diagram.AxisY.WholeRange.Auto = false;
+            diagram.AxisY.WholeRange.SetMinMaxValues(0.97, 1.02);
+            chartControl2.Series.Add(series3);
+            chartControl2.Series.Add(series4);
+        }
     }
+
+    public class StatisticResults
+    {
+        [DisplayName("Model")]
+        public string ModelName { get; set; }
+        [DisplayName("Slope")]
+        public double Slope { get; set; }
+        [DisplayName("Volatility S_(t+1)/S_t")]
+        public double stDevideVolatility { get; set; }
+        [DisplayName("Volatility F_t/S_t")]
+        public double ftDevideVolatility { get; set; }
+        [DisplayName("Volatility (F_t-S_(t+1))/S_t")]
+        public double ftMinusStDevideVolatility { get; set; }
+        [DisplayName("Autocorrelation S_(t+1)/S_t")]
+        public double stDevideAutocorrelation { get; set; }
+        [DisplayName("Autocorrelation F_t/S_t")]
+        public double ftDevideAutocorrelation { get; set; }
+        [DisplayName("Autocorrelation (F_t-S_(t+1))/S_t")]
+        public double ftMinusStDevideAutocorrelation { get; set; }
+
+        public StatisticResults(string modelName, double slope,
+            double stDevideVolatility, double ftDevideVolatility, double ftMinusStDevideVolatility,
+            double stDevideAutocorrelation, double ftDevideAutocorrelation, double ftMinusStDevideAutocorrelation)
+        {
+            this.ModelName = modelName;
+            this.Slope = slope;
+            this.stDevideVolatility = stDevideVolatility;
+            this.ftDevideVolatility = ftDevideVolatility;
+            this.ftMinusStDevideVolatility = ftMinusStDevideVolatility;
+            this.stDevideAutocorrelation = stDevideAutocorrelation;
+            this.ftDevideAutocorrelation = ftDevideAutocorrelation;
+            this.ftMinusStDevideAutocorrelation = ftMinusStDevideAutocorrelation;
+        }
+        public static StatisticResults MarkResult()
+        {
+            return new StatisticResults("Mark Result",
+                -1.444,
+                0.014,
+                0.006,
+                0.029,
+                0.105,
+                0.006,
+                0.628);
+        }
+
+        public static StatisticResults RealResult()
+        {
+            return new StatisticResults("Data", 
+                -0.293, 
+                0.060, 
+                0.080, 
+                0.061, 
+                0.007, 
+                0.888, 
+                0.026);
+        }
+
+        public static double CalculateSlope(List<double> dataX, List<double> dataY)
+        {
+            var x = new DoubleMatrix(new DoubleVector(dataX.ToArray()));
+            var y = new DoubleVector(dataY.ToArray());
+            var lst = new DoubleLeastSquares(x, y, true);
+            return lst.X[1];
+        }
+
+        public static double CalculateSlope(List<double> data)
+        {
+            double n = data.Count;
+            double sumXY = 0;
+            double sumX = 0;
+            double sumY = data.Sum();
+            double sumX2 = 0;
+
+            for (int i = 0; i < n; i++)
+            {
+                sumXY += i * data[i];
+                sumX += i;
+                sumX2 += i * i;
+            }
+
+            return (n * sumXY - sumX * sumY) / (n * sumX2 - Math.Pow(sumX, 2));
+        }
+
+
+        public static double CalculateVolatility(List<double> data)
+        {
+            var array = new DoubleVector(data.ToArray());
+            return StatsFunctions.StandardDeviation(array);
+        }
+
+        public static double CalculateAutocorrelation(List<double> data, int lag)
+        {
+            int n = data.Count;
+
+            if (lag >= n)
+            {
+                throw new ArgumentException("Заданный лаг больше размера данных.");
+            }
+
+            double mean = data.Average();
+            double numerator = 0;
+            double denominator = 0;
+
+            for (int i = 0; i < n - lag; i++)
+            {
+                numerator += (data[i] - mean) * (data[i + lag] - mean);
+                denominator += Math.Pow(data[i] - mean, 2);
+            }
+
+            return numerator / denominator;
+        }
+    }
+    // TODO: Clean up this class and rename it
     public class Populaster
     {
         [DisplayName(" ")]

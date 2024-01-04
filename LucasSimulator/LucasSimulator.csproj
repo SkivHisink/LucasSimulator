@@ -43,8 +43,16 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Properties\licenses.licx" />
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
     <EmbeddedResource Include="XtraForm1.resx" />
     <EmbeddedResource Include="XtraUserControl1.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CenterSpace.NMath.Standard.Windows.X64" Version="7.4.0.46" />
   </ItemGroup>
 
   <ItemGroup>

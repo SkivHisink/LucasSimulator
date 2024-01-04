@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(XtraForm1));
             this.xtraUserControl11 = new LucasSimulator.XtraUserControl1();
             this.SuspendLayout();
             // 
@@ -45,8 +46,10 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(909, 553);
             this.Controls.Add(this.xtraUserControl11);
+            this.IconOptions.Image = ((System.Drawing.Image)(resources.GetObject("XtraForm1.IconOptions.Image")));
+            this.MinimumSize = new System.Drawing.Size(911, 585);
             this.Name = "XtraForm1";
-            this.Text = "XtraForm1";
+            this.Text = "Lucas Simulator";
             this.ResumeLayout(false);
 
         }
